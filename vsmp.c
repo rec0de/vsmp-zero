@@ -4,6 +4,8 @@
 
 #define BITS_PER_PIXEL 4
 
+#define FRAMES_PER_HOUR 24
+
 // Use RPi hardware acceleration to decode video frames
 // requires custom-compiled ffmpeg and a h264 encoded video and no funky pixel format (8bpp grayscale works)
 // also requires ~128 MB graphics memory on the pi
@@ -187,7 +189,7 @@ int main(int argc, const char *argv[]) {
       backupProgress(target);
 
     int timeSpent = (clock() - loopstart) / CLOCKS_PER_SEC;
-    int sleepTime = 150 - timeSpent;
+    int sleepTime = (3600 / FRAMES_PER_HOUR) - timeSpent;
     sleep(sleepTime);
   }
 
