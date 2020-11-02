@@ -7,11 +7,13 @@ This is my take on the concept of a very slow movie player, as previously done b
 and, originally, [Bryan Boyer](https://medium.com/s/story/very-slow-movie-player-499f76c48b62).  
 As opposed to their implementations, this one is written in C to be close to the hardware, using libav and the [IT8951 C library](https://github.com/waveshare/IT8951) by waveshare to display frames from a video file on an ePaper display.
 
-The code is designed for and tested with the [1872x1404 E-Ink panel](https://www.waveshare.com/product/raspberry-pi/displays/e-paper/7.8inch-e-paper-hat.htm) from waveshare. You should be able to make it work with any other panel by customizing the `processFrame` method.
+The code is designed for and tested with the [1872x1404 E-Ink panel](https://www.waveshare.com/product/raspberry-pi/displays/e-paper/7.8inch-e-paper-hat.htm) from waveshare. Other panels using the same controller should work out of the box, for other panels you might have to customize the `processFrame` method.
 
 ## Pre-processing
 
 vsmp-zero does not perform scaling, grayscale or framerate conversion of the video at runtime to save on computation and implementation complexity. You should pre-process your input accordingly on a faster machine using ffmpeg.
+
+*details / examples to come*
 
 ## Dependencies
 
