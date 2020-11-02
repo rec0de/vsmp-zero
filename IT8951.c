@@ -1,3 +1,11 @@
+/*
+This is a modified version of the waveshare IT8951 library
+Originally found at https://github.com/waveshare/IT8951
+
+Large parts not relevant to the vsmp use-case have been removed,
+some features have been added or optimized
+*/
+
 #include "IT8951.h"
 
 //Global varivale
@@ -10,8 +18,7 @@ uint32_t gulImgBufAddr; //IT8951 Image buffer address
 void LCDWaitForReady()
 {
 	uint8_t ulData = bcm2835_gpio_lev(HRDY);
-	while(ulData == 0)
-	{
+	while(ulData == 0) {
 		ulData = bcm2835_gpio_lev(HRDY);
 	}
 }
@@ -62,6 +69,8 @@ void LCDWriteData(uint16_t usData)
 	bcm2835_gpio_write(CS,HIGH); 
 }
 
+// This is the preformance-improved modified write method by Naluhh
+// From here: https://github.com/waveshare/IT8951/pull/3/commits/6dc34e3469ed3a72046ca2b69d162133aa0acc30
 void LCDWriteNData(uint8_t *data, uint32_t len)
 {
 	//Set Preamble for Write Data
@@ -135,8 +144,7 @@ void LCDReadNData(uint16_t* pwBuf, uint32_t ulSizeWordCnt)
 	
 	LCDWaitForReady();
 	
-	for(i=0;i<ulSizeWordCnt;i++)
-	{
+	for(i=0;i<ulSizeWordCnt;i++) {
 		pwBuf[i] = bcm2835_spi_transfer(0x00)<<8;
 		pwBuf[i] |= bcm2835_spi_transfer(0x00);
 	}
@@ -149,19 +157,19 @@ void LCDReadNData(uint16_t* pwBuf, uint32_t ulSizeWordCnt)
 //-----------------------------------------------------------
 void LCDSendCmdArg(uint16_t usCmdCode,uint16_t* pArg, uint16_t usNumArg)
 {
-     uint16_t i;
-     //Send Cmd code
-     LCDWriteCmdCode(usCmdCode);
-     //Send Data
-     for(i=0;i<usNumArg;i++)
-     {
-         LCDWriteData(pArg[i]);
-     }
+    uint16_t i;
+    //Send Cmd code
+    LCDWriteCmdCode(usCmdCode);
+    //Send Data
+    for(i=0;i<usNumArg;i++) {
+        LCDWriteData(pArg[i]);
+    }
 }
 
 //-----------------------------------------------------------
 //Host Cmd 1---SYS_RUN
 //-----------------------------------------------------------
+// starts the IT8951 controller and the display
 void IT8951SystemRun()
 {
     LCDWriteCmdCode(IT8951_TCON_SYS_RUN);
@@ -178,6 +186,9 @@ void IT8951StandBy()
 //-----------------------------------------------------------
 //Host Cmd 3---SLEEP
 //-----------------------------------------------------------
+// puts the controller and the display to sleep
+// call this if you won't update the display for a while to
+// save energy and prevent display degradation
 void IT8951Sleep()
 {
     LCDWriteCmdCode(IT8951_TCON_SLEEP);
@@ -300,8 +311,7 @@ void IT8951MemBurstWriteProc(uint32_t ulMemAddr , uint32_t ulWriteSize, uint16_t
     IT8951MemBurstWrite(ulMemAddr , ulWriteSize);
  
     //Burst Write Data
-    for(i=0;i<ulWriteSize;i++)
-    {
+    for(i=0;i<ulWriteSize;i++) {
         LCDWriteData(pSrcBuf[i]);
     }
  
@@ -390,17 +400,21 @@ void GetIT8951SystemInfo(void* pBuf)
 	LCDWriteCmdCode(USDEF_I80_CMD_GET_DEV_INFO);
  
 	//Burst Read Request for SPI interface only
-	LCDReadNData(pusWord, sizeof(IT8951DevInfo)/2);//Polling HRDY for each words(2-bytes) if possible
+	LCDReadNData(pusWord, sizeof(IT8951DevInfo)/2); //Polling HRDY for each words(2-bytes) if possible
 	
 	//Show Device information of IT8951
 	pstDevInfo = (IT8951DevInfo*)pBuf;
-	//printf("Panel(W,H) = (%d,%d)\r\n",
-	//pstDevInfo->usPanelW, pstDevInfo->usPanelH );
-	//printf("Image Buffer Address = %X\r\n",
-	//pstDevInfo->usImgBufAddrL | (pstDevInfo->usImgBufAddrH << 16));
+
+	// Unnecessary debug output
+	/*
+	printf("Panel(W,H) = (%d,%d)\r\n",
+	pstDevInfo->usPanelW, pstDevInfo->usPanelH );
+	printf("Image Buffer Address = %X\r\n",
+	pstDevInfo->usImgBufAddrL | (pstDevInfo->usImgBufAddrH << 16));
 	//Show Firmware and LUT Version
-	//printf("FW Version = %s\r\n", (uint8_t*)pstDevInfo->usFWVersion);
-	//printf("LUT Version = %s\r\n", (uint8_t*)pstDevInfo->usLUTVersion);
+	printf("FW Version = %s\r\n", (uint8_t*)pstDevInfo->usFWVersion);
+	printf("LUT Version = %s\r\n", (uint8_t*)pstDevInfo->usLUTVersion);
+	*/
 }
 
 //-----------------------------------------------------------
@@ -432,6 +446,9 @@ void IT8951WaitForDisplayReady()
 //-----------------------------------------------------------
 //Display function 2---Load Image Area process
 //-----------------------------------------------------------
+// Copies data to the IT8951 internal buffer but does not refresh the display
+// This function is modified following Naluhh's version from https://github.com/waveshare/IT8951/pull/3/commits/6dc34e3469ed3a72046ca2b69d162133aa0acc30
+// It expects an 8bpp frame buffer (as produced by ffmpeg), which is converted to 4bpp and sent in a 4bpp packed format
 void IT8951HostAreaPackedPixelWrite(IT8951LdImgInfo* pstLdImgInfo, IT8951AreaImgInfo* pstAreaImgInfo)
 {	
 	uint8_t* pusFrameBuf = (uint8_t*)pstLdImgInfo->ulStartFBAddr;
@@ -444,6 +461,7 @@ void IT8951HostAreaPackedPixelWrite(IT8951LdImgInfo* pstLdImgInfo, IT8951AreaImg
 		j += 1;
 		i += 2;
 		// Skip dead space in ffmpeg frame
+		// TODO: not sure if this is entirely correct
 		if(i % pstAreaImgInfo->usLinesize == 0)
 			i += ldiff;
 	}
@@ -469,6 +487,7 @@ void IT8951Clear() {
 //-----------------------------------------------------------
 //Display functions 3---Application for Display panel Area
 //-----------------------------------------------------------
+// Set a given area to what is in the IT8951 buffer
 void IT8951DisplayArea(uint16_t usX, uint16_t usY, uint16_t usW, uint16_t usH, uint16_t usDpyMode)
 {
 	//Send I80 Display Command (User defined command of IT8951)
@@ -509,8 +528,7 @@ void IT8951DisplayAreaBuf(uint16_t usX, uint16_t usY, uint16_t usW, uint16_t usH
 //-----------------------------------------------------------
 uint8_t IT8951_Init()
 {
-	if (!bcm2835_init()) 
-	{
+	if (!bcm2835_init()) {
 		printf("bcm2835_init error \n");
 		return 1;
 	}
@@ -540,8 +558,7 @@ uint8_t IT8951_Init()
  	//Set to Enable I80 Packed mode
  	IT8951WriteReg(I80CPCR, 0x0001);
 
-	if (VCOM != IT8951GetVCOM())
-	{
+	if (VCOM != IT8951GetVCOM()) {
 		IT8951SetVCOM(VCOM);
 		//printf("VCOM = -%.02fV\n",(float)IT8951GetVCOM()/1000);
 	}

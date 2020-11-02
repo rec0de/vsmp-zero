@@ -1,10 +1,20 @@
-#define DRYRUN 1
+// Set to one to not actually use the display but output to a .pgm file
+// Can be used to compile / test on a faster machine
+#define DRYRUN 0
 
-#define BITS_PER_PIXEL 1
-#define HWACCEL 0
-#define LIGHSENSE 0
+#define BITS_PER_PIXEL 4
+
+// Use RPi hardware acceleration to decode video frames
+// requires custom-compiled ffmpeg and a h264 encoded video and no funky pixel format (8bpp grayscale works)
+// also requires ~128 MB graphics memory on the pi
+#define HWACCEL 1
+
+// Enable lighsense to only update the display if some ambient light is detected
+#define LIGHSENSE 1
 #define LIGHTSENSE_THRESHOLD 1000000
+#define LIGHTSENSE_GPIO_PIN RPI_V2_GPIO_P1_07
 
+// Colour depth conversion things
 #define BPP_MUL (256 / ((1 << BITS_PER_PIXEL) - 1))
 #define BPP_BIAS (BPP_MUL / 2)
 #define BPP_CLIP (255 - BPP_BIAS)
@@ -45,6 +55,8 @@ void cleanup() {
 // Duration of one frame in AV_TIME_BASE units
 int64_t timeBase;
 
+// libav code patched together from multiple sources,
+// most importantly https://github.com/leandromoreira/ffmpeg-libav-tutorial/blob/master/0_hello_world.c
 int main(int argc, const char *argv[]) {
 
   if (argc < 2) {
@@ -292,6 +304,7 @@ static void processFrame(unsigned char *frameBuf, int linesize, int width, int h
   stLdImgInfo.ulImgBufBaseAddr = gulImgBufAddr; // just leave as is i guess
 
   //Set Load Area
+  // center the frame on the panel as well as possible
   stAreaImgInfo.usX      = ((gstI80DevInfo.usPanelW - width) >> 2) << 1; // Uneven x-offsets mess things up
   stAreaImgInfo.usY      = (gstI80DevInfo.usPanelH - height) / 2;
   stAreaImgInfo.usWidth  = width;
@@ -346,22 +359,24 @@ static void backupProgress(int target) {
 
 #if LIGHSENSE
 
+  // Adapted from https://pimylifeup.com/raspberry-pi-light-sensor/
   static int lightsense() {
-    uint8_t pin = RPI_V2_GPIO_P1_07;
 
-    bcm2835_gpio_fsel(pin, BCM2835_GPIO_FSEL_OUTP);
-    bcm2835_gpio_clr(pin);
-
+    // tie the lighsense pin low to drain the capacitor
+    bcm2835_gpio_fsel(LIGHTSENSE_GPIO_PIN, BCM2835_GPIO_FSEL_OUTP);
+    bcm2835_gpio_clr(LIGHTSENSE_GPIO_PIN);
     sleep(0.1);
     
-    bcm2835_gpio_set_pud(pin, BCM2835_GPIO_PUD_OFF);
-    bcm2835_gpio_fsel(pin, BCM2835_GPIO_FSEL_INPT);
+    // switch the lighsense pin to input
+    bcm2835_gpio_set_pud(LIGHTSENSE_GPIO_PIN, BCM2835_GPIO_PUD_OFF);
+    bcm2835_gpio_fsel(LIGHTSENSE_GPIO_PIN, BCM2835_GPIO_FSEL_INPT);
 
     uint8_t data = 0;
     int count = 0;
 
+    // measure how long it takes for the capacitor to charge
     while(data == 0 && count < LIGHTSENSE_THRESHOLD) {
-        data = bcm2835_gpio_lev(pin);
+        data = bcm2835_gpio_lev(LIGHTSENSE_GPIO_PIN);
         count++;
     }
 
