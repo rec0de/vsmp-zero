@@ -13,7 +13,10 @@ The code is designed for and tested with the [1872x1404 E-Ink panel](https://www
 
 vsmp-zero does not perform scaling, grayscale or framerate conversion of the video at runtime to save on computation and implementation complexity. You should pre-process your input accordingly on a faster machine using ffmpeg.
 
-*details / examples to come*
+An example preprocessing command might look like this:  
+`ffmpeg -i in.mkv -an -sn -c:v libx264 -vf "fps=fps=7,format=gray,pad=max(iw\,ih*(16/9)):ow/(16/9):(ow-iw)/2:(oh-ih)/2,scale=1872:-1" -aspect 16:9 -threads 4 out.mkv`  
+
+This command removes any audio- or subtitle tracks, pads the input to a 16:9 aspect ratio with a width of 1872 px (the width of our panel), and reduces the framerate to 7fps such that playing the file frame-by-frame will be around 3x faster than playing at the original speed (assuming a 24fps input framerate). It also encodes the video in grayscale h264, for which the Raspberry Pi has hardware decoding support. 
 
 ## Dependencies
 
