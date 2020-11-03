@@ -3,8 +3,8 @@
 #define DRYRUN 0
 
 #define BITS_PER_PIXEL 4
-
-#define FRAMES_PER_HOUR 24
+#define FRAMES_PER_HOUR 24 // refresh the display this many times per hour
+#define FRAME_STEP_SIZE 1  // on every display refresh, move this many frames forward in the source file
 
 // Use RPi hardware acceleration to decode video frames
 // requires custom-compiled ffmpeg and a h264 encoded video and no funky pixel format (8bpp grayscale works)
@@ -61,8 +61,22 @@ int64_t timeBase;
 // most importantly https://github.com/leandromoreira/ffmpeg-libav-tutorial/blob/master/0_hello_world.c
 int main(int argc, const char *argv[]) {
 
-  if (argc < 2) {
-    printf("You need to specify a media file and a start frame index.\n");
+  int target = 0;
+
+  if (argc == 2) {
+    printf("Attempting to read vsmp-index file\n");
+    FILE *f = fopen("vsmp-index", "r");
+    char fidx[16];
+    fgets(fidx, 16, f);
+    target = atoi(fidx);
+    fclose(f);
+    printf("Resuming playback at frame %d\n", target);
+  }
+  else if (argc == 3) {
+    target = atoi(argv[2]);
+  }
+  else {
+    printf("Usage: vsmp [video file] [frame index]\n");
     return -1;
   }
 
@@ -163,7 +177,6 @@ int main(int argc, const char *argv[]) {
     printf("Display cleared \n");
   #endif
 
-  int target = atoi(argv[2]);
   int64_t timestamp = target * timeBase;
   clock_t loopstart;
   uint8_t consecutivePaints = 0;
@@ -182,7 +195,7 @@ int main(int argc, const char *argv[]) {
     #endif
 
     consecutivePaints++;
-    target++;
+    target += FRAME_STEP_SIZE;
     timestamp = target * timeBase;
 
     if(consecutivePaints % 32 == 0)
