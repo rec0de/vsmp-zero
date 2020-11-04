@@ -5,6 +5,7 @@
 #define BITS_PER_PIXEL 4
 #define FRAMES_PER_HOUR 24 // refresh the display this many times per hour
 #define FRAME_STEP_SIZE 1  // on every display refresh, move this many frames forward in the source file
+#define WHITE_VALUE 150
 
 // Use RPi hardware acceleration to decode video frames
 // requires custom-compiled ffmpeg and a h264 encoded video and no funky pixel format (8bpp grayscale works)
@@ -257,6 +258,17 @@ static void displayFrame(
   }
 }
 
+// Performs simple white value adjustment
+// Everything above newWhite in the buffer will be plain white
+static unsigned char contrastAdjust(unsigned char newWhite, unsigned char pixel) {
+  unsigned int in = pixel;
+  unsigned int out = (in << 8)/(newWhite);
+  if(out > 255)
+    return 255;
+  else
+    return (unsigned char) out;
+}
+
 static unsigned char nearestPaletteColor(unsigned char pixel) {
   if(pixel > BPP_CLIP)
     return 255;
@@ -274,11 +286,18 @@ static unsigned char clippedAdd(unsigned char base, int8_t bias) {
     return (unsigned char) intermediate;
 }
 
-// Basic Floyd-Steinberg dithering
+// Basic Floyd-Steinberg dithering & contrast adjustments
 static void dither(unsigned char *frameBuf, int linesize, int width, int height) {
   uint32_t i,j,idx;
   unsigned char oldpixel, newpixel;
   int8_t quantError;
+
+  for(j = 0; j < height; j++) {
+    for(i = 0; i < width; i++) {
+      idx = j * linesize + i;
+      frameBuf[idx] = contrastAdjust(WHITE_VALUE, frameBuf[idx]);
+    }
+  }
     
   for(j = 0; j < height; j++) {
     for(i = 0; i < width; i++) {
