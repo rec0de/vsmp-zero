@@ -7,6 +7,7 @@ some features have been added or optimized
 */
 
 #include "IT8951.h"
+#include "vsmp.h"
 
 //Global varivale
 IT8951DevInfo gstI80DevInfo;
@@ -450,20 +451,46 @@ void IT8951WaitForDisplayReady()
 // This function is modified following Naluhh's version from https://github.com/waveshare/IT8951/pull/3/commits/6dc34e3469ed3a72046ca2b69d162133aa0acc30
 // It expects an 8bpp frame buffer (as produced by ffmpeg), which is converted to 4bpp and sent in a 4bpp packed format
 void IT8951HostAreaPackedPixelWrite(IT8951LdImgInfo* pstLdImgInfo, IT8951AreaImgInfo* pstAreaImgInfo)
-{	
-	uint8_t* pusFrameBuf = (uint8_t*)pstLdImgInfo->ulStartFBAddr;
+{
+	// Pixel format explainer:
+	// Assume we want to transmit 8 consecutive pixels in 2 bpp mode
+	// In the ffmpeg buffer, these look like this:
+	// [11111111] [22222222] [33333333] [44444444] [55555555] ...
+	// Packed to 2 bpp, it should look like this:
+	// [11223344] [55667788]
+	// This means we have to use big endian encoding to ensure that
+	// these two bytes are read in the order they are written here
+	// Note that according to the IT8951 datasheet, the pixels should be
+	// transferred as [44332211] [88776655], but the behaviour of the endianness-flag
+	// is not specified anywhere. I suspect that the flag also reverses the intra-byte
+	// pixel order
+	// Anyway, the given code appears to work...
+	pstLdImgInfo->usEndianType = IT8951_LDIMG_B_ENDIAN;
+	pstLdImgInfo->usPixelFormat = TRANSPORT_BPP_FLAG; 
 
-	// Convert 8bpp buffer to 4bpp buffer
+	uint8_t* pusFrameBuf = (uint8_t*)pstLdImgInfo->ulStartFBAddr;
+	uint8_t bpp = TRANSPORT_BPP;
+	uint8_t bpp_shift = 8 - bpp;
+	uint8_t ppb = 8 / bpp;
+
+	// Convert 8bpp buffer to x bpp buffer
 	uint32_t i = 0, j = 0, ldiff;
+	uint8_t b = 0;
+	uint8_t tmp;
 	ldiff = pstAreaImgInfo->usLinesize - pstAreaImgInfo->usWidth;
 	while (i < pstAreaImgInfo->usHeight * pstAreaImgInfo->usLinesize) {
-		pusFrameBuf[j] = (pusFrameBuf[i] >> 4) + (pusFrameBuf[i + 1] >> 4 << 4);
+		tmp = 0;
+		for (b = 0; b < ppb; ++b){
+			// Intra-byte order should be [12345678], not [87654321]
+			tmp |= (pusFrameBuf[i] >> bpp_shift) << ((ppb - b - 1) * bpp);
+			i += 1;
+			// Skip dead space in ffmpeg frame
+			if(i % pstAreaImgInfo->usLinesize == pstAreaImgInfo->usWidth)
+				i += ldiff;
+		}
+
+		pusFrameBuf[j] = tmp;
 		j += 1;
-		i += 2;
-		// Skip dead space in ffmpeg frame
-		// TODO: not sure if this is entirely correct
-		if(i % pstAreaImgInfo->usLinesize == 0)
-			i += ldiff;
 	}
 
 	//Set Image buffer(IT8951) Base address
@@ -472,7 +499,7 @@ void IT8951HostAreaPackedPixelWrite(IT8951LdImgInfo* pstLdImgInfo, IT8951AreaImg
 	IT8951LoadImgAreaStart(pstLdImgInfo, pstAreaImgInfo);
 	
 	// Copy buffer to IT8951
-	LCDWriteNData(pusFrameBuf, pstAreaImgInfo->usHeight * pstAreaImgInfo->usWidth / 2);
+	LCDWriteNData(pusFrameBuf, pstAreaImgInfo->usHeight * pstAreaImgInfo->usWidth / ppb);
 
 	//Send Load Img End Command
 	IT8951LoadImgEnd();

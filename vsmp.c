@@ -26,6 +26,9 @@ static int lightsense();
 
 static void backupProgress(int frame);
 
+// Duration of one frame in AV_TIME_BASE units
+int64_t timeBase;
+
 void cleanup() {
   printf("Shutting down");
   #if DRYRUN != 1
@@ -33,9 +36,6 @@ void cleanup() {
   #endif
   exit(0);
 }
-
-// Duration of one frame in AV_TIME_BASE units
-int64_t timeBase;
 
 // libav code patched together from multiple sources,
 // most importantly https://github.com/leandromoreira/ffmpeg-libav-tutorial/blob/master/0_hello_world.c
@@ -311,8 +311,6 @@ static void processFrame(unsigned char *frameBuf, int linesize, int width, int h
 
   //Setting Load image information
   stLdImgInfo.ulStartFBAddr    = (uint32_t) frameBuf; // Pointer to frame buffer
-  stLdImgInfo.usEndianType     = IT8951_LDIMG_B_ENDIAN;
-  stLdImgInfo.usPixelFormat    = IT8951_4BPP; 
   stLdImgInfo.usRotate         = IT8951_ROTATE_0;
   stLdImgInfo.ulImgBufBaseAddr = gulImgBufAddr; // just leave as is i guess
 
