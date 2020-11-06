@@ -1,6 +1,15 @@
 # vsmp-zero
 A very slow movie player designed for the Raspberry Pi Zero
 
+## Features
+
+* Variable color depth dithering
+* Optimized, pixel-packed data transfer
+* On-device white-level adjustment
+* Supports all panels using IT8951 controller
+* Supports hardware accelerated video decoding
+* Supports ambient light sensing to pause display updates in darkness
+
 ## Context
 
 This is my take on the concept of a very slow movie player, as previously done by [Tom Whitwell](https://debugger.medium.com/how-to-build-a-very-slow-movie-player-in-2020-c5745052e4e4)
