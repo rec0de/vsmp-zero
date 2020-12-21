@@ -10,6 +10,8 @@ A very slow movie player designed for the Raspberry Pi Zero
 * Supports hardware accelerated video decoding
 * Supports ambient light sensing to pause display updates in darkness
 
+![A black and white dithered still image from the movie 'In the Mood for Love'](img/header.png)
+
 ## Context
 
 This is my take on the concept of a very slow movie player, as previously done by [Tom Whitwell](https://debugger.medium.com/how-to-build-a-very-slow-movie-player-in-2020-c5745052e4e4)
@@ -47,3 +49,13 @@ The current frame index is backed up periodically to a file called `vsmp-index`.
 
 This repo comes with a modified version of the IT8951 library, so all you need is the [bcm2835](http://www.airspayce.com/mikem/bcm2835/) library as well as libavformat, libavcodec and libavutil.  
 To use hardware acceleration for video decoding, you'll have to use custom-built ffmpeg libraries (see [https://maniaclander.blogspot.com/2017/08/ffmpeg-with-pi-hardware-acceleration.html](https://maniaclander.blogspot.com/2017/08/ffmpeg-with-pi-hardware-acceleration.html)).
+
+## Sample images
+
+If you're not inspired yet, here's another sample image from *In the Mood for Love* which I think came out really great. The first image is dithered to 1 bit per pixel, the second one to 2 bits per pixel.
+
+![A black and white dithered still image from the movie 'In the Mood for Love'](img/dither-1bpp.png)
+
+![A black and white dithered still image from the movie 'In the Mood for Love'](img/dither-2bpp.png)
+
+![An enlarged detail view of the previous image, showing a rice bowl with chopsticks](img/dither-detail.png)
