@@ -28,6 +28,7 @@ static void backupProgress(int frame);
 
 // Duration of one frame in AV_TIME_BASE units
 int64_t timeBase;
+int target = 0;
 
 void cleanup() {
   printf("Shutting down");
@@ -40,8 +41,6 @@ void cleanup() {
 // libav code patched together from multiple sources,
 // most importantly https://github.com/leandromoreira/ffmpeg-libav-tutorial/blob/master/0_hello_world.c
 int main(int argc, const char *argv[]) {
-
-  int target = 0;
 
   if (argc == 2) {
     printf("Attempting to read vsmp-index file\n");
@@ -214,7 +213,11 @@ static void displayFrame(
   av_seek_frame(formatCtx, streamIdx, timestamp, AVSEEK_FLAG_BACKWARD);
 
   char breakflag = 0;
-  while (av_read_frame(formatCtx, packet) >= 0) {
+  int status = av_read_frame(formatCtx, packet);
+
+  // For some reason, the mmal decoder freaks out every now and then (~ once per week?), which I believe causes an endless loop here
+  // So if we get an unknown decoding error, we'll just skip this frame
+  while (status >= 0 && status != AVERROR_UNKNOWN) {
     if (packet->stream_index == streamIdx) {
       int response = avcodec_send_packet(codecCtx, packet);
 
@@ -234,6 +237,7 @@ static void displayFrame(
         break;
     }
     av_packet_unref(packet);
+    status = av_read_frame(formatCtx, packet);
   }
 }
 
@@ -342,7 +346,7 @@ static void processFrame(unsigned char *frameBuf, int linesize, int width, int h
     int i;
     char frame_filename[1024];
 
-    snprintf(frame_filename, sizeof(frame_filename), "%s.pgm", "frame");
+    snprintf(frame_filename, sizeof(frame_filename), "%s-%d.pgm", "frame", target);
     f = fopen(frame_filename,"w");
 
     // writing the minimal required header for a pgm file format
