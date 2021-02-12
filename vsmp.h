@@ -6,15 +6,15 @@
 #define TRANSPORT_BPP 4 // Bit packing used for transfer to the display controller - set equal to or higher than BPP to avoid quality loss. Supported values are 2, 4 and 8
 #define FRAMES_PER_HOUR 24 // refresh the display this many times per hour
 #define FRAME_STEP_SIZE 1  // on every display refresh, move this many frames forward in the source file
-#define WHITE_VALUE 150
+#define WHITE_VALUE 255
 
 // Use RPi hardware acceleration to decode video frames
 // requires custom-compiled ffmpeg and a h264 encoded video and no funky pixel format (8bpp grayscale works)
 // also requires ~128 MB graphics memory on the pi
-#define HWACCEL 1
+#define HWACCEL 0
 
 // Enable lighsense to only update the display if some ambient light is detected
-#define LIGHSENSE 1
+#define LIGHSENSE 0
 #define LIGHTSENSE_THRESHOLD 1000000
 #define LIGHTSENSE_GPIO_PIN RPI_V2_GPIO_P1_07
 
