@@ -182,7 +182,8 @@ int main(int argc, const char *argv[]) {
 
     int timeSpent = (clock() - loopstart) / CLOCKS_PER_SEC;
     int sleepTime = (3600 / FRAMES_PER_HOUR) - timeSpent;
-    sleep(sleepTime);
+    if(sleepTime > 0)
+      sleep(sleepTime);
   }
 
   // CLEANUP
@@ -252,6 +253,17 @@ static unsigned char contrastAdjust(unsigned char newWhite, unsigned char pixel)
     return (unsigned char) out;
 }
 
+static void contrastAdjustBuffer(unsigned char *frameBuf, int linesize, int width, int height) {
+  uint32_t i,j,idx;
+
+  for(j = 0; j < height; j++) {
+    for(i = 0; i < width; i++) {
+      idx = j * linesize + i;
+      frameBuf[idx] = contrastAdjust(WHITE_VALUE, frameBuf[idx]);
+    }
+  }
+}
+
 static unsigned char nearestPaletteColor(unsigned char pixel) {
   if(pixel > BPP_CLIP)
     return 255;
@@ -269,37 +281,88 @@ static unsigned char clippedAdd(unsigned char base, int8_t bias) {
     return (unsigned char) intermediate;
 }
 
+static int8_t quantizePixel(unsigned char *buf, uint idx) {
+  unsigned char oldpixel = buf[idx];
+  unsigned char newpixel = nearestPaletteColor(oldpixel);
+  buf[idx] = newpixel;
+  return (int8_t) oldpixel - newpixel;
+}
+
+static void diffuseError(unsigned char *buf, uint idx, int8_t error, int8_t weight) {
+  buf[idx] = clippedAdd(buf[idx], error * weight / 16);
+}
+
 // Basic Floyd-Steinberg dithering & contrast adjustments
 static void dither(unsigned char *frameBuf, int linesize, int width, int height) {
   uint32_t i,j,idx;
-  unsigned char oldpixel, newpixel;
   int8_t quantError;
-
-  for(j = 0; j < height; j++) {
-    for(i = 0; i < width; i++) {
-      idx = j * linesize + i;
-      frameBuf[idx] = contrastAdjust(WHITE_VALUE, frameBuf[idx]);
-    }
-  }
+  
+  contrastAdjustBuffer(frameBuf, linesize, width, height);
     
   for(j = 0; j < height; j++) {
     for(i = 0; i < width; i++) {
-      idx = j * linesize + i;
-      oldpixel = frameBuf[idx];
-      newpixel = nearestPaletteColor(oldpixel);
-      frameBuf[idx] = newpixel;
-      quantError = oldpixel - newpixel;
+      uint idx = j * linesize + i;
+      quantError = quantizePixel(frameBuf, idx);
 
       if(i != width-1)
-        frameBuf[idx + 1] = clippedAdd(frameBuf[idx + 1], quantError * 7 / 16);
+        diffuseError(frameBuf, idx + 1, quantError, 7);
 
       if(j != height-1) {
-        frameBuf[idx + linesize] = clippedAdd(frameBuf[idx + linesize], quantError * 5 / 16);
+        diffuseError(frameBuf, idx + linesize, quantError, 5);
 
         if(i != width-1)
-          frameBuf[idx + linesize + 1] = clippedAdd(frameBuf[idx + linesize + 1], quantError / 16);
+          diffuseError(frameBuf, idx + linesize + 1, quantError, 1);
         if(i != 0)
-          frameBuf[idx + linesize - 1] = clippedAdd(frameBuf[idx + linesize - 1], quantError * 3 / 16);
+          diffuseError(frameBuf, idx + linesize - 1, quantError, 3);
+      }
+    }
+  }
+}
+
+// Serpentine Floyd-Steinberg dithering
+// Essentially reverses dithering direction every line for more even texture
+static void ditherSerpentine(unsigned char *frameBuf, int linesize, int width, int height) {
+  uint32_t i,j,idx;
+  int8_t quantError;
+  
+  contrastAdjustBuffer(frameBuf, linesize, width, height);
+    
+  for(j = 0; j < height; j++) {
+    for(i = 0; i < width; i++) {
+      uint idx = j * linesize + i;
+      quantError = quantizePixel(frameBuf, idx);
+
+      if(i != width-1)
+        diffuseError(frameBuf, idx + 1, quantError, 7);
+
+      if(j != height-1) {
+        diffuseError(frameBuf, idx + linesize, quantError, 5);
+
+        if(i != width-1)
+          diffuseError(frameBuf, idx + linesize + 1, quantError, 1);
+        if(i != 0)
+          diffuseError(frameBuf, idx + linesize - 1, quantError, 3);
+      }
+    }
+
+    j++;
+    if(j == height)
+      continue;
+
+    for(i = width; i > 0; i--) {
+      uint idx = j * linesize + i - 1;
+      quantError = quantizePixel(frameBuf, idx);
+
+      if(i != 0)
+        diffuseError(frameBuf, idx - 1, quantError, 7);
+
+      if(j != height-1) {
+        diffuseError(frameBuf, idx + linesize, quantError, 5);
+
+        if(i != 0)
+          diffuseError(frameBuf, idx + linesize - 1, quantError, 1);
+        if(i != width - 1)
+          diffuseError(frameBuf, idx + linesize + 1, quantError, 3);
       }
     }
   }
@@ -308,7 +371,7 @@ static void dither(unsigned char *frameBuf, int linesize, int width, int height)
 #if DRYRUN != 1
 
 static void processFrame(unsigned char *frameBuf, int linesize, int width, int height) {
-  dither(frameBuf, linesize, width, height);
+  ditherSerpentine(frameBuf, linesize, width, height);
 
   IT8951LdImgInfo stLdImgInfo;
   IT8951AreaImgInfo stAreaImgInfo;
@@ -353,7 +416,7 @@ static void processFrame(unsigned char *frameBuf, int linesize, int width, int h
     // portable graymap format -> https://en.wikipedia.org/wiki/Netpbm_format#PGM_example
     fprintf(f, "P5\n%d %d\n%d\n", width, height, 255);
 
-    dither(frameBuf, linesize, width, height);
+    ditherSerpentine(frameBuf, linesize, width, height);
 
     // writing line by line
     for (i = 0; i < height; i++)
