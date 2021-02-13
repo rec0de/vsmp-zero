@@ -43,7 +43,25 @@ To continue running after you close the console, you might want to use `nohup` a
 
 `sudo nohup ./vsmp [video file] [start frame index] &`
 
-The current frame index is backed up periodically to a file called `vsmp-index`. If the frame index argument is omitted on startup and an index file is found, playback is resumed at the last saved frame index.
+The current frame index is backed up periodically to a file called `vsmp-index`. If the frame index argument is omitted on startup and an index file is found, playback is resumed at the last saved frame index.  
+
+If you'd like to have vsmp started automatically on boot, you might want to use this very bare-bone systemd service file:
+
+```
+[Unit]
+Description=VSMP
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=[this is where the vsmp-index file will be]
+ExecStart=[path to vsmp executable] [path to video file relative to working dir]
+
+[Install]
+WantedBy=multi-user.target
+```
+
+You can save the contents of this file to e.g. `/etc/systemd/system/vsmp.service` and then run `sudo systemctl enable vsmp` to start vsmp on boot.
 
 ## Dependencies
 
