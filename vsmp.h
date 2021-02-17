@@ -18,6 +18,20 @@
 #define LIGHTSENSE_THRESHOLD 1000000
 #define LIGHTSENSE_GPIO_PIN RPI_V2_GPIO_P1_07
 
+/* Choose dithering algorithm, one of:
+1. floydSteinberg             very common, slight patterns / artifacts
+2. floydSteinbergSerpentine   less artifacts than regular floyd-steinberg, more even dot-spacing
+3. interleavedGradient        somewhat similar to Bayer dithering, noticable hatching patterns
+4. blueNoise                  a bit more memory-intensive, very organic looking
+
+Further reading:
+1: https://en.wikipedia.org/wiki/Floyd%E2%80%93Steinberg_dithering
+2: see above
+3: https://bartwronski.com/2016/10/30/dithering-part-three-real-world-2d-quantization-dithering/ > Interleaved Gradient Noise
+4: https://surma.dev/things/ditherpunk > Blue Noise
+*/
+#define DITHER floydSteinbergSerpentine
+
 // Automatically calculated definitions, please do not change
 
 // Colour depth conversion things

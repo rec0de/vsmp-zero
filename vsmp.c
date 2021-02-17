@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include "vsmp.h"
+#include "dither.c"
 
 #if DRYRUN != 1
   #include <bcm2835.h>
@@ -264,114 +265,11 @@ static void contrastAdjustBuffer(unsigned char *frameBuf, int linesize, int widt
   }
 }
 
-static unsigned char nearestPaletteColor(unsigned char pixel) {
-  if(pixel > BPP_CLIP)
-    return 255;
-  return ((pixel + BPP_BIAS) / BPP_MUL) * BPP_MUL;
-}
-
-static unsigned char clippedAdd(unsigned char base, int8_t bias) {
-  int16_t intermediate = bias + base;
-  
-  if(intermediate > 255)
-    return 255;
-  else if(intermediate < 0)
-    return 0;
-  else
-    return (unsigned char) intermediate;
-}
-
-static int8_t quantizePixel(unsigned char *buf, uint idx) {
-  unsigned char oldpixel = buf[idx];
-  unsigned char newpixel = nearestPaletteColor(oldpixel);
-  buf[idx] = newpixel;
-  return (int8_t) oldpixel - newpixel;
-}
-
-static void diffuseError(unsigned char *buf, uint idx, int8_t error, int8_t weight) {
-  buf[idx] = clippedAdd(buf[idx], error * weight / 16);
-}
-
-// Basic Floyd-Steinberg dithering & contrast adjustments
-static void dither(unsigned char *frameBuf, int linesize, int width, int height) {
-  uint32_t i,j,idx;
-  int8_t quantError;
-  
-  contrastAdjustBuffer(frameBuf, linesize, width, height);
-    
-  for(j = 0; j < height; j++) {
-    for(i = 0; i < width; i++) {
-      uint idx = j * linesize + i;
-      quantError = quantizePixel(frameBuf, idx);
-
-      if(i != width-1)
-        diffuseError(frameBuf, idx + 1, quantError, 7);
-
-      if(j != height-1) {
-        diffuseError(frameBuf, idx + linesize, quantError, 5);
-
-        if(i != width-1)
-          diffuseError(frameBuf, idx + linesize + 1, quantError, 1);
-        if(i != 0)
-          diffuseError(frameBuf, idx + linesize - 1, quantError, 3);
-      }
-    }
-  }
-}
-
-// Serpentine Floyd-Steinberg dithering
-// Essentially reverses dithering direction every line for more even texture
-static void ditherSerpentine(unsigned char *frameBuf, int linesize, int width, int height) {
-  uint32_t i,j,idx;
-  int8_t quantError;
-  
-  contrastAdjustBuffer(frameBuf, linesize, width, height);
-    
-  for(j = 0; j < height; j++) {
-    for(i = 0; i < width; i++) {
-      uint idx = j * linesize + i;
-      quantError = quantizePixel(frameBuf, idx);
-
-      if(i != width-1)
-        diffuseError(frameBuf, idx + 1, quantError, 7);
-
-      if(j != height-1) {
-        diffuseError(frameBuf, idx + linesize, quantError, 5);
-
-        if(i != width-1)
-          diffuseError(frameBuf, idx + linesize + 1, quantError, 1);
-        if(i != 0)
-          diffuseError(frameBuf, idx + linesize - 1, quantError, 3);
-      }
-    }
-
-    j++;
-    if(j == height)
-      continue;
-
-    for(i = width; i > 0; i--) {
-      uint idx = j * linesize + i - 1;
-      quantError = quantizePixel(frameBuf, idx);
-
-      if(i != 0)
-        diffuseError(frameBuf, idx - 1, quantError, 7);
-
-      if(j != height-1) {
-        diffuseError(frameBuf, idx + linesize, quantError, 5);
-
-        if(i != 0)
-          diffuseError(frameBuf, idx + linesize - 1, quantError, 1);
-        if(i != width - 1)
-          diffuseError(frameBuf, idx + linesize + 1, quantError, 3);
-      }
-    }
-  }
-}
-
 #if DRYRUN != 1
 
 static void processFrame(unsigned char *frameBuf, int linesize, int width, int height) {
-  ditherSerpentine(frameBuf, linesize, width, height);
+  contrastAdjustBuffer(frameBuf, linesize, width, height);
+  DITHER(frameBuf, linesize, width, height);
 
   IT8951LdImgInfo stLdImgInfo;
   IT8951AreaImgInfo stAreaImgInfo;
@@ -416,7 +314,8 @@ static void processFrame(unsigned char *frameBuf, int linesize, int width, int h
     // portable graymap format -> https://en.wikipedia.org/wiki/Netpbm_format#PGM_example
     fprintf(f, "P5\n%d %d\n%d\n", width, height, 255);
 
-    ditherSerpentine(frameBuf, linesize, width, height);
+    contrastAdjustBuffer(frameBuf, linesize, width, height);
+    DITHER(frameBuf, linesize, width, height);
 
     // writing line by line
     for (i = 0; i < height; i++)
