@@ -157,6 +157,27 @@ static void blueNoise(unsigned char *frameBuf, int linesize, int width, int heig
   }
 }
 
+static void whiteNoise(unsigned char *frameBuf, int linesize, int width, int height) {
+  uint32_t i,j,idx;
+
+  int8_t *randomMask = (int8_t *) malloc(width * height * sizeof(int8_t));
+  FILE *devRandom = fopen("/dev/urandom", "r");  
+
+  fread(randomMask, sizeof(int8_t), width * height, devRandom);
+  fclose(devRandom);
+  
+    
+  for(j = 0; j < height; j++) {
+    for(i = 0; i < width; i++) {
+      idx = j * linesize + i;
+      frameBuf[idx] = clippedAdd(frameBuf[idx], randomMask[j * width + i]);
+      quantizePixel(frameBuf, idx);
+    }
+  }
+
+  free(randomMask);
+}
+
 // Serpentine dithering by Hong and Kim
 static void hongKimSerpentine(unsigned char *frameBuf, int linesize, int width, int height) {
   uint32_t i,j,idx;
