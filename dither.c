@@ -159,6 +159,7 @@ static void blueNoise(unsigned char *frameBuf, int linesize, int width, int heig
 
 static void whiteNoise(unsigned char *frameBuf, int linesize, int width, int height) {
   uint32_t i,j,idx;
+  uint8_t noise;
 
   int8_t *randomMask = (int8_t *) malloc(width * height * sizeof(int8_t));
   FILE *devRandom = fopen("/dev/urandom", "r");  
@@ -170,7 +171,8 @@ static void whiteNoise(unsigned char *frameBuf, int linesize, int width, int hei
   for(j = 0; j < height; j++) {
     for(i = 0; i < width; i++) {
       idx = j * linesize + i;
-      frameBuf[idx] = clippedAdd(frameBuf[idx], randomMask[j * width + i]);
+      noise = (((int) randomMask[j * width + i]) * BPP_MUL) >> 8;
+      frameBuf[idx] = clippedAdd(frameBuf[idx], noise - BPP_BIAS);
       quantizePixel(frameBuf, idx);
     }
   }
