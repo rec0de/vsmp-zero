@@ -6,6 +6,7 @@ A very slow movie player designed for the Raspberry Pi Zero
 * Variable color depth dithering
 * Optimized, pixel-packed data transfer
 * On-device white-level adjustment
+* So many dithering modes
 * Supports all panels using IT8951 controller
 * Supports hardware accelerated video decoding
 * Supports ambient light sensing to pause display updates in darkness
@@ -19,6 +20,11 @@ and, originally, [Bryan Boyer](https://medium.com/s/story/very-slow-movie-player
 As opposed to their implementations, this one is written in C to be close to the hardware, using libav and the [IT8951 C library](https://github.com/waveshare/IT8951) by waveshare to display frames from a video file on an ePaper display.
 
 The code is designed for and tested with the [1872x1404 E-Ink panel](https://www.waveshare.com/product/raspberry-pi/displays/e-paper/7.8inch-e-paper-hat.htm) from waveshare. Other panels using the same controller should work out of the box, for other panels you might have to customize the `processFrame` method.
+
+## Dependencies
+
+This repo comes with a modified version of the IT8951 library, so all you need is the [bcm2835](http://www.airspayce.com/mikem/bcm2835/) library as well as libavformat, libavcodec and libavutil.  
+To use hardware acceleration for video decoding, you'll have to use custom-built ffmpeg libraries (see [https://maniaclander.blogspot.com/2017/08/ffmpeg-with-pi-hardware-acceleration.html](https://maniaclander.blogspot.com/2017/08/ffmpeg-with-pi-hardware-acceleration.html)).
 
 ## Pre-processing
 
@@ -63,10 +69,18 @@ WantedBy=multi-user.target
 
 You can save the contents of this file to e.g. `/etc/systemd/system/vsmp.service` and then run `sudo systemctl enable vsmp` to start vsmp on boot.
 
-## Dependencies
+## Dithering Algorithms
 
-This repo comes with a modified version of the IT8951 library, so all you need is the [bcm2835](http://www.airspayce.com/mikem/bcm2835/) library as well as libavformat, libavcodec and libavutil.  
-To use hardware acceleration for video decoding, you'll have to use custom-built ffmpeg libraries (see [https://maniaclander.blogspot.com/2017/08/ffmpeg-with-pi-hardware-acceleration.html](https://maniaclander.blogspot.com/2017/08/ffmpeg-with-pi-hardware-acceleration.html)).
+Do you need nine different dithering algorithms? Probably not. The default should be fine, and for high-res displays with multiple grey-levels you probably won't be able to tell most of them apart. But it turns out image halftoning is a fascinating rabbit hole and there are loads of different ways to do it - so why not play with a bunch of them?  
+Currently, vsmp-zero supports the following dithering modes:
+
+- Floyd-Steinberg (regular and serpentine, default)
+- Interleaved Noise
+- Blue Noise
+- White Noise
+- Sierra (full and two-row versions)
+- Stucki
+- Atkinson
 
 ## Sample images
 
