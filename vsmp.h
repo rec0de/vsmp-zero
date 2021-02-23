@@ -23,12 +23,17 @@
 2. floydSteinbergSerpentine   less artifacts than regular floyd-steinberg, more even dot-spacing
 3. interleavedGradient        somewhat similar to Bayer dithering, noticable hatching patterns
 4. blueNoise                  a bit more memory-intensive, very organic looking
+5. whiteNoise                 naive random-noise dithering, very noisy / grainy
+6. fullSierra                 rather large diffusion matrix, good quality
+7. twoRowSierra               simplified version of Sierra dithering, more artifacts
+8. stucki                     very large diffusion matrix, good quality, slight patterns
+9. atkinson                   reduced color-bleed, less detail in light / dark regions
 
 Further reading:
-1: https://en.wikipedia.org/wiki/Floyd%E2%80%93Steinberg_dithering
-2: see above
-3: https://bartwronski.com/2016/10/30/dithering-part-three-real-world-2d-quantization-dithering/ > Interleaved Gradient Noise
-4: https://surma.dev/things/ditherpunk > Blue Noise
+1-2: https://en.wikipedia.org/wiki/Floyd%E2%80%93Steinberg_dithering
+3  : https://bartwronski.com/2016/10/30/dithering-part-three-real-world-2d-quantization-dithering/ > Interleaved Gradient Noise
+4-5: https://surma.dev/things/ditherpunk
+6-9: https://tannerhelland.com/2012/12/28/dithering-eleven-algorithms-source-code.html
 */
 #define DITHER floydSteinbergSerpentine
 

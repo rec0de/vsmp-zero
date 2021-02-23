@@ -22,8 +22,8 @@ static int8_t quantizePixel(unsigned char *buf, uint idx) {
   return (int8_t) oldpixel - newpixel;
 }
 
-static void diffuseError(unsigned char *buf, uint idx, int8_t error, int8_t weight) {
-  buf[idx] = clippedAdd(buf[idx], error * weight / 16);
+static void diffuseError(unsigned char *buf, uint idx, int8_t error, int8_t weight, int8_t base) {
+  buf[idx] = clippedAdd(buf[idx], (int8_t) ((((int) error) * weight) / base));
 }
 
 static uint8_t* loadNoise() {
@@ -46,19 +46,19 @@ static void floydSteinberg(unsigned char *frameBuf, int linesize, int width, int
     
   for(j = 0; j < height; j++) {
     for(i = 0; i < width; i++) {
-      uint idx = j * linesize + i;
+      idx = j * linesize + i;
       quantError = quantizePixel(frameBuf, idx);
 
       if(i != width-1)
-        diffuseError(frameBuf, idx + 1, quantError, 7);
+        diffuseError(frameBuf, idx + 1, quantError, 7, 16);
 
       if(j != height-1) {
-        diffuseError(frameBuf, idx + linesize, quantError, 5);
+        diffuseError(frameBuf, idx + linesize, quantError, 5, 16);
 
         if(i != width-1)
-          diffuseError(frameBuf, idx + linesize + 1, quantError, 1);
+          diffuseError(frameBuf, idx + linesize + 1, quantError, 1, 16);
         if(i != 0)
-          diffuseError(frameBuf, idx + linesize - 1, quantError, 3);
+          diffuseError(frameBuf, idx + linesize - 1, quantError, 3, 16);
       }
     }
   }
@@ -72,19 +72,19 @@ static void floydSteinbergSerpentine(unsigned char *frameBuf, int linesize, int 
     
   for(j = 0; j < height; j++) {
     for(i = 0; i < width; i++) {
-      uint idx = j * linesize + i;
+      idx = j * linesize + i;
       quantError = quantizePixel(frameBuf, idx);
 
       if(i != width-1)
-        diffuseError(frameBuf, idx + 1, quantError, 7);
+        diffuseError(frameBuf, idx + 1, quantError, 7, 16);
 
       if(j != height-1) {
-        diffuseError(frameBuf, idx + linesize, quantError, 5);
+        diffuseError(frameBuf, idx + linesize, quantError, 5, 16);
 
         if(i != width-1)
-          diffuseError(frameBuf, idx + linesize + 1, quantError, 1);
+          diffuseError(frameBuf, idx + linesize + 1, quantError, 1, 16);
         if(i != 0)
-          diffuseError(frameBuf, idx + linesize - 1, quantError, 3);
+          diffuseError(frameBuf, idx + linesize - 1, quantError, 3, 16);
       }
     }
 
@@ -93,19 +93,19 @@ static void floydSteinbergSerpentine(unsigned char *frameBuf, int linesize, int 
       continue;
 
     for(i = width; i > 0; i--) {
-      uint idx = j * linesize + i - 1;
+      idx = j * linesize + i - 1;
       quantError = quantizePixel(frameBuf, idx); // For cool glitch, quantize everything to 0 here
 
       if(i != 0)
-        diffuseError(frameBuf, idx - 1, quantError, 7);
+        diffuseError(frameBuf, idx - 1, quantError, 7, 16);
 
       if(j != height-1) {
-        diffuseError(frameBuf, idx + linesize, quantError, 5);
+        diffuseError(frameBuf, idx + linesize, quantError, 5, 16);
 
         if(i != 0)
-          diffuseError(frameBuf, idx + linesize - 1, quantError, 1);
+          diffuseError(frameBuf, idx + linesize - 1, quantError, 1, 16);
         if(i != width - 1)
-          diffuseError(frameBuf, idx + linesize + 1, quantError, 3);
+          diffuseError(frameBuf, idx + linesize + 1, quantError, 3, 16);
       }
     }
   }
@@ -178,58 +178,154 @@ static void whiteNoise(unsigned char *frameBuf, int linesize, int width, int hei
   free(randomMask);
 }
 
-// Serpentine dithering by Hong and Kim
-static void hongKimSerpentine(unsigned char *frameBuf, int linesize, int width, int height) {
+static void atkinson(unsigned char *frameBuf, int linesize, int width, int height) {
   uint32_t i,j,idx;
   int8_t quantError;
-  int8_t nextPixThreshAdjust;
-  int8_t* nextLineTreshAdjust = malloc(width * sizeof(int8_t));
     
   for(j = 0; j < height; j++) {
     for(i = 0; i < width; i++) {
-      uint idx = j * linesize + i;
+      idx = j * linesize + i;
       quantError = quantizePixel(frameBuf, idx);
 
+      // Same row diffusion
       if(i != width-1)
-        diffuseError(frameBuf, idx + 1, quantError, 4);
+        diffuseError(frameBuf, idx+1, quantError, 1, 8);
+      if(i < width-2)
+        diffuseError(frameBuf, idx+2, quantError, 1, 8);
 
-      if(j != height-1) {
-        diffuseError(frameBuf, idx + linesize, quantError, 4);
-        if(i != width-1)
-          diffuseError(frameBuf, idx + linesize + 1, quantError, 3);
-      }
+      if(j == height-1)
+        continue;
 
-      if(j < height-2) {
-        diffuseError(frameBuf, idx + linesize * 2, quantError, 3);
-        if(i != width-1)
-          diffuseError(frameBuf, idx + linesize * 2 + 1, quantError, 2);
-      }
-    }
-
-    j++;
-    if(j == height)
-      continue;
-
-    for(i = width; i > 0; i--) {
-      uint idx = j * linesize + i - 1;
-      quantError = quantizePixel(frameBuf, idx);
-
+      // Next row diffusion      
+      diffuseError(frameBuf, idx + linesize, quantError, 1, 8);
       if(i != 0)
-        diffuseError(frameBuf, idx - 1, quantError, 4);
+        diffuseError(frameBuf, idx + linesize - 1, quantError, 1, 8);
+      if(i != width-1)
+        diffuseError(frameBuf, idx + linesize + 1, quantError, 1, 8);
 
-      if(j != height-1) {
-        diffuseError(frameBuf, idx + linesize, quantError, 4);
-        if(i != 0)
-          diffuseError(frameBuf, idx + linesize - 1, quantError, 3);
-      }
-
-      if(j < height-2) {
-        diffuseError(frameBuf, idx + linesize * 2, quantError, 3);
-        if(i != 0)
-          diffuseError(frameBuf, idx + linesize * 2 - 1, quantError, 2);
-      }
+      // Third row diffusion
+      if(j != height-2)
+        diffuseError(frameBuf, idx + linesize * 2, quantError, 1, 8);
     }
   }
+}
 
-  free(nextLineTreshAdjust);
+static void fullSierra(unsigned char *frameBuf, int linesize, int width, int height) {
+  uint32_t i,j,idx;
+  int8_t quantError;
+    
+  for(j = 0; j < height; j++) {
+    for(i = 0; i < width; i++) {
+      idx = j * linesize + i;
+      quantError = quantizePixel(frameBuf, idx);
+
+      // Same row diffusion
+      if(i != width-1)
+        diffuseError(frameBuf, idx+1, quantError, 5, 32);
+      if(i < width-2)
+        diffuseError(frameBuf, idx+2, quantError, 3, 32);
+
+      if(j == height-1)
+        continue;
+
+      // Next row diffusion      
+      diffuseError(frameBuf, idx + linesize, quantError, 5, 32);
+      if(i != 0)
+        diffuseError(frameBuf, idx + linesize - 1, quantError, 4, 32);
+      if(i > 1)
+        diffuseError(frameBuf, idx + linesize - 2, quantError, 2, 32);
+      if(i != width-1)
+        diffuseError(frameBuf, idx + linesize + 1, quantError, 4, 32);
+      if(i < width-2)
+        diffuseError(frameBuf, idx + linesize + 2, quantError, 2, 32);
+
+      if(j == height-2)
+        continue;
+
+      // Third row diffusion
+      diffuseError(frameBuf, idx + linesize * 2, quantError, 3, 32);
+      if(i != 0)
+        diffuseError(frameBuf, idx + linesize * 2 - 1, quantError, 2, 32);
+      if(i != width-1)
+        diffuseError(frameBuf, idx + linesize * 2 + 1, quantError, 2, 32);
+    }
+  }
+}
+
+static void twoRowSierra(unsigned char *frameBuf, int linesize, int width, int height) {
+  uint32_t i,j,idx;
+  int8_t quantError;
+    
+  for(j = 0; j < height; j++) {
+    for(i = 0; i < width; i++) {
+      idx = j * linesize + i;
+      quantError = quantizePixel(frameBuf, idx);
+
+      // Same row diffusion
+      if(i != width-1)
+        diffuseError(frameBuf, idx+1, quantError, 4, 16);
+      if(i < width-2)
+        diffuseError(frameBuf, idx+2, quantError, 3, 16);
+
+      if(j == height-1)
+        continue;
+
+      // Next row diffusion      
+      diffuseError(frameBuf, idx + linesize, quantError, 3, 16);
+      if(i != 0)
+        diffuseError(frameBuf, idx + linesize - 1, quantError, 2, 16);
+      if(i > 1)
+        diffuseError(frameBuf, idx + linesize - 2, quantError, 1, 16);
+      if(i != width-1)
+        diffuseError(frameBuf, idx + linesize + 1, quantError, 2, 16);
+      if(i < width-2)
+        diffuseError(frameBuf, idx + linesize + 2, quantError, 1, 16);
+    }
+  }
+}
+
+static void stucki(unsigned char *frameBuf, int linesize, int width, int height) {
+  uint32_t i,j,idx;
+  int8_t quantError;
+    
+  for(j = 0; j < height; j++) {
+    for(i = 0; i < width; i++) {
+      idx = j * linesize + i;
+      quantError = quantizePixel(frameBuf, idx);
+
+      // Same row diffusion
+      if(i != width-1)
+        diffuseError(frameBuf, idx+1, quantError, 8, 42);
+      if(i < width-2)
+        diffuseError(frameBuf, idx+2, quantError, 4, 42);
+
+      if(j == height-1)
+        continue;
+
+      // Next row diffusion      
+      diffuseError(frameBuf, idx + linesize, quantError, 8, 42);
+      if(i != 0)
+        diffuseError(frameBuf, idx + linesize - 1, quantError, 4, 42);
+      if(i > 1)
+        diffuseError(frameBuf, idx + linesize - 2, quantError, 2, 42);
+      if(i != width-1)
+        diffuseError(frameBuf, idx + linesize + 1, quantError, 4, 42);
+      if(i < width-2)
+        diffuseError(frameBuf, idx + linesize + 2, quantError, 2, 42);
+
+      if(j == height-2)
+        continue;
+
+      // Third row diffusion
+      diffuseError(frameBuf, idx + linesize * 2, quantError, 4, 42);
+      if(i != 0)
+        diffuseError(frameBuf, idx + linesize * 2 - 1, quantError, 2, 42);
+      if(i > 1)
+        diffuseError(frameBuf, idx + linesize * 2 - 2, quantError, 1, 42);
+      if(i != width-1)
+        diffuseError(frameBuf, idx + linesize * 2 + 1, quantError, 2, 42);
+      if(i < width-2)
+        diffuseError(frameBuf, idx + linesize * 2 + 2, quantError, 1, 42);
+    }
+  }
 }
