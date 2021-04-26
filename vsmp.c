@@ -8,6 +8,7 @@
 #include "dither.c"
 
 #if DRYRUN != 1
+  // Change this include if you're using a custom display driver
   #include "displays/genericIT8951.c"
 #else
   #include "displays/dryrun.c"

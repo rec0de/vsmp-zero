@@ -7,7 +7,7 @@ some features have been added or optimized
 */
 
 #include "IT8951.h"
-#include "vsmp.h"
+#include "../vsmp.h"
 
 //Global varivale
 IT8951DevInfo gstI80DevInfo;
