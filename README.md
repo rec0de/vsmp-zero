@@ -98,7 +98,7 @@ As of now, only displays using the IT8951 controller are supported out of the bo
 
 If you want to work with an unsupported display, you'll have to provide what I'll call a *display driver file*, which is included by `vsmp.c`.  
 
-All that this driver file has to do is provide implementations of a few functions used by `vsmp-zero` — you can have a look at `displays/genericIT8951.c` and `displays/dryrun.c` for some examples.  
+All that this driver file has to do is provide implementations of a few functions used by `vsmp-zero` — you can have a look at `displays/genericIT8951.c` and `displays/dryrun.c` for some examples. Most of the time, you should get away with some clever copy/pasting from the waveshare example code for your display.  
 
 Generally speaking, your file should look something like this:
 ```c
