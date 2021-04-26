@@ -95,8 +95,11 @@ If you're not inspired yet, here's another sample image from *In the Mood for Lo
 ## Adding support for other displays
 
 As of now, only displays using the IT8951 controller are supported out of the box. It appears that many of the cheaper waveshare displays are different in very subtle ways, so there is likely no one comprehensive solution to support them all.  
+
 If you want to work with an unsupported display, you'll have to provide what I'll call a *display driver file*, which is included by `vsmp.c`.  
-All that this driver file has to do is provide implementations of a few functions used by `vsmp-zero` --- you can have a look at `displays/genericIT8951.c` and `displays/dryrun.c` for some examples.  
+
+All that this driver file has to do is provide implementations of a few functions used by `vsmp-zero` — you can have a look at `displays/genericIT8951.c` and `displays/dryrun.c` for some examples.  
+
 Generally speaking, your file should look something like this:
 ```c
 static int initDisplay() {
@@ -115,11 +118,16 @@ static void clearDisplay() {
 static void pixelPush(unsigned char *frameBuf, int linesize, int width, int height) {
 	/* Writes an image buffer to the display and displays it.
 	   Each entry in the frame buffer is a single greyscale pixel at 8bpp.
-	   You may need to perform some downconversion here (e.g. packing 8 pixels into a singly byte at 1bpp) depending on the display.
-	   Note that the height / width are that of your video file, not necessarily your display. You may want to perform some scaling or aligning here.
-	   Also note that one line in the frame buffer (given by linesize) can be longer than the actual line of pixels.
+	   You may need to perform some downconversion here depending on the display
+	   (e.g. packing 8 pixels into a singly byte at 1bpp).
+	   Note that the height / width are that of your video file, not necessarily your display.
+	   You may want to perform some scaling or aligning here.
+	   Also note that one line in the frame buffer (given by linesize)
+	   can be longer than the actual line of pixels.
 
-	   To put less strain on your display and ensure a long lifetime, you should also set your display to sleep / standby at the end of this method and wake it up (if necessary) at the beginning.
+	   To put less strain on your display and ensure a long lifetime,
+	   you should also set your display to sleep / standby at the end of this method
+	   and wake it up (if necessary) at the beginning.
 	*/
 }
 ```
