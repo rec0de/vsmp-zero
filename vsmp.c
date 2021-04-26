@@ -8,8 +8,13 @@
 #include "dither.c"
 
 #if DRYRUN != 1
+  #include "displays/genericIT8951.c"
+#else
+  #include "displays/dryrun.c"
+#endif
+
+#if LIGHSENSE == 1
   #include <bcm2835.h>
-  #include "IT8951.h"
 #endif
 
 static void displayFrame(
@@ -33,9 +38,7 @@ int target = 0;
 
 void cleanup() {
   printf("Shutting down");
-  #if DRYRUN != 1
-    IT8951_Cancel();
-  #endif
+  teardownDisplay();
   exit(0);
 }
 
@@ -60,14 +63,11 @@ int main(int argc, const char *argv[]) {
     return -1;
   }
 
-  #if DRYRUN != 1
-    // Init IT8951
-    if(IT8951_Init()) {
-      printf("IT8951_Init error \n");
-      return 1;
-    }
-    printf("IT8951 initialized\n");
-  #endif
+  if(initDisplay()) {
+    printf("Display init error \n");
+    return 1;
+  }
+  printf("Display initialized\n");
   
   // AVFormatContext holds the header information from the format (Container)
   // http://ffmpeg.org/doxygen/trunk/structAVFormatContext.html
@@ -152,10 +152,8 @@ int main(int argc, const char *argv[]) {
   // INIT DONE
   printf("FFmpeg init done\n");
 
-  #if DRYRUN != 1
-    IT8951Clear();
-    printf("Display cleared \n");
-  #endif
+  clearDisplay();
+  printf("Display cleared \n");
 
   int64_t timestamp = target * timeBase;
   clock_t loopstart;
@@ -189,9 +187,7 @@ int main(int argc, const char *argv[]) {
 
   // CLEANUP
 
-  #if DRYRUN != 1
-    IT8951_Cancel();
-  #endif
+  teardownDisplay();
 
   avformat_close_input(&pFormatContext);
   av_packet_free(&pPacket);
@@ -265,67 +261,11 @@ static void contrastAdjustBuffer(unsigned char *frameBuf, int linesize, int widt
   }
 }
 
-#if DRYRUN != 1
-
 static void processFrame(unsigned char *frameBuf, int linesize, int width, int height) {
   contrastAdjustBuffer(frameBuf, linesize, width, height);
   DITHER(frameBuf, linesize, width, height);
-
-  IT8951LdImgInfo stLdImgInfo;
-  IT8951AreaImgInfo stAreaImgInfo;
-
-  //Setting Load image information
-  stLdImgInfo.ulStartFBAddr    = (uint32_t) frameBuf; // Pointer to frame buffer
-  stLdImgInfo.usRotate         = IT8951_ROTATE_0;
-  stLdImgInfo.ulImgBufBaseAddr = gulImgBufAddr; // just leave as is i guess
-
-  //Set Load Area
-  // center the frame on the panel as well as possible
-  stAreaImgInfo.usX      = ((gstI80DevInfo.usPanelW - width) >> 2) << 1; // Uneven x-offsets mess things up
-  stAreaImgInfo.usY      = (gstI80DevInfo.usPanelH - height) / 2;
-  stAreaImgInfo.usWidth  = width;
-  stAreaImgInfo.usHeight = height;
-  stAreaImgInfo.usLinesize = linesize;
-
-  IT8951SystemRun();
-  IT8951WaitForDisplayReady();
-  
-  //Load Image from Host to IT8951 Image Buffer
-  IT8951HostAreaPackedPixelWrite(&stLdImgInfo, &stAreaImgInfo);
-
-  //Display Area (x,y,w,h) with mode 2 for fast gray clear mode - depends on current waveform 
-  IT8951DisplayArea(stAreaImgInfo.usX, stAreaImgInfo.usY, stAreaImgInfo.usWidth, stAreaImgInfo.usHeight, 2);
-
-  IT8951WaitForDisplayReady();
-  IT8951Sleep();
+  pixelPush(frameBuf, linesize, width, height);
 }
-
-#else
-
-  static void processFrame(unsigned char *frameBuf, int linesize, int width, int height) {
-    FILE *f;
-    int i;
-    char frame_filename[1024];
-
-    snprintf(frame_filename, sizeof(frame_filename), "%s-%d.pgm", "frame", target);
-    f = fopen(frame_filename,"w");
-
-    // writing the minimal required header for a pgm file format
-    // portable graymap format -> https://en.wikipedia.org/wiki/Netpbm_format#PGM_example
-    fprintf(f, "P5\n%d %d\n%d\n", width, height, 255);
-
-    contrastAdjustBuffer(frameBuf, linesize, width, height);
-    DITHER(frameBuf, linesize, width, height);
-
-    // writing line by line
-    for (i = 0; i < height; i++)
-      fwrite(frameBuf + i * linesize, 1, width, f);
-    fclose(f);
-
-    printf("Wrote frame pgm file\n");
-  }
-
-#endif
 
 static void backupProgress(int target) {
   FILE *f;
