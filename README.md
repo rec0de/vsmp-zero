@@ -91,3 +91,37 @@ If you're not inspired yet, here's another sample image from *In the Mood for Lo
 ![A black and white dithered still image from the movie 'In the Mood for Love'](img/dither-2bpp.png)
 
 ![An enlarged detail view of the previous image, showing a rice bowl with chopsticks](img/dither-detail.png)
+
+## Adding support for other displays
+
+As of now, only displays using the IT8951 controller are supported out of the box. It appears that many of the cheaper waveshare displays are different in very subtle ways, so there is likely no one comprehensive solution to support them all.  
+If you want to work with an unsupported display, you'll have to provide what I'll call a *display driver file*, which is included by `vsmp.c`.  
+All that this driver file has to do is provide implementations of a few functions used by `vsmp-zero` --- you can have a look at `displays/genericIT8951.c` and `displays/dryrun.c` for some examples.  
+Generally speaking, your file should look something like this:
+```c
+static int initDisplay() {
+	// Initialization code, only executed once on program start
+	// return non-zero integer to indicate failure
+}
+
+static void teardownDisplay() {
+	// Cleanup code executed on program termination
+}
+
+static void clearDisplay() {
+	// Clears whatever is on the display, displays a white screen
+}
+
+static void pixelPush(unsigned char *frameBuf, int linesize, int width, int height) {
+	/* Writes an image buffer to the display and displays it.
+	   Each entry in the frame buffer is a single greyscale pixel at 8bpp.
+	   You may need to perform some downconversion here (e.g. packing 8 pixels into a singly byte at 1bpp) depending on the display.
+	   Note that the height / width are that of your video file, not necessarily your display. You may want to perform some scaling or aligning here.
+	   Also note that one line in the frame buffer (given by linesize) can be longer than the actual line of pixels.
+
+	   To put less strain on your display and ensure a long lifetime, you should also set your display to sleep / standby at the end of this method and wake it up (if necessary) at the beginning.
+	*/
+}
+```
+
+If you successfully go through all that and add support for a new display type, feel free to open a pull request with your driver file and share your work!
