@@ -150,6 +150,14 @@ int main(int argc, const char *argv[]) {
     return -1;
   }
 
+  #if LIGHSENSE
+    if (!bcm2835_init()) {
+      printf("bcm2835_init error (lightsense init) \n");
+      return 1;
+    }
+    printf("Lightsense init done \n");
+  #endif
+
   // INIT DONE
   printf("FFmpeg init done\n");
 
